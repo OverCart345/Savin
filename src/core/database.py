@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 from types import TracebackType
 
 from core.config import settings
@@ -9,31 +9,31 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
 
 from typing import Optional, Type
 
-class UnitOfWork:
+class AsyncUnitOfWork:
     def __init__(self) -> None:
-        self.session: Session = SessionLocal()
+        self.session: AsyncSession = AsyncSessionLocal()
 
-    def __enter__(self) -> Session:
+    async def __aenter__(self) -> AsyncSession:
         return self.session
 
-    def __exit__(
+    async def __aexit__(
             self, 
             exc_type: Optional[Type[BaseException]],
             exc: Optional[BaseException], 
             tb: Optional[TracebackType]
         ) -> None:
         if exc_type is not None:
-            self.session.rollback()
+            await self.session.rollback()
         else:
-            self.session.commit()
-        self.session.close()
+            await self.session.commit()
+        await self.session.close()
 
 
-def get_db():
-    with UnitOfWork() as session:
+async def get_db():
+    async with AsyncUnitOfWork() as session:
         yield session

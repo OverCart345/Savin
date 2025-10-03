@@ -1,30 +1,31 @@
 from typing import List, Optional
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.article import Article
 
 
 class ArticleRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def get_by_id(self, article_id: int) -> Optional[Article]:
-        return self.db.get(Article, article_id)
+    async def get_by_id(self, article_id: int) -> Optional[Article]:
+        return await self.db.get(Article, article_id)
 
-    def list(self, limit: int = 20, offset: int = 0) -> List[Article]:
+    async def list(self, limit: int = 20, offset: int = 0) -> List[Article]:
         stmt = select(Article).limit(limit).offset(offset)
-        return list(self.db.execute(stmt).scalars().all())
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
 
-    def create(self, article: Article) -> Article:
+    async def create(self, article: Article) -> Article:
         self.db.add(article)
-        self.db.flush()
+        await self.db.flush()
         return article
 
-    def update(self, article: Article) -> Article:
-        self.db.flush()
+    async def update(self, article: Article) -> Article:
+        await self.db.flush()
         return article
 
-    def delete(self, article: Article) -> None:
+    async def delete(self, article: Article) -> None:
         self.db.delete(article)

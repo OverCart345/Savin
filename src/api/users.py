@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db_session, get_current_user
 from core.security import create_access_token
@@ -12,7 +12,7 @@ from models.user import User
 router = APIRouter(prefix="/api", tags=["users"])
 
 
-def _make_service(db: Session) -> UserService:
+def _make_service(db: AsyncSession) -> UserService:
     return UserService(UserRepository(db))
 
 
@@ -25,10 +25,10 @@ def _build_response(user: User) -> dict:
 
 
 @router.post("/users")
-def register_user(payload: UserCreate, db: Session = Depends(get_db_session)):
+async def register_user(payload: UserCreate, db: AsyncSession = Depends(get_db_session)):
     service = _make_service(db)
     try:
-        user = service.register(
+        user = await service.register(
             email=payload.email,
             username=payload.username,
             password=payload.password,
@@ -41,13 +41,13 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db_session)):
 
 
 @router.post("/users/login")
-def login_user(payload: UserLogin, db: Session = Depends(get_db_session)):
+async def login_user(payload: UserLogin, db: AsyncSession = Depends(get_db_session)):
     service = _make_service(db)
     try:
-        token = service.authenticate(payload.email, payload.password)
+        token = await service.authenticate(payload.email, payload.password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    user = UserRepository(db).get_by_email(payload.email)
+    user = await UserRepository(db).get_by_email(payload.email)
     return {
         "user": UserOut.model_validate(user.__dict__, from_attributes=True),
         "token": TokenOut(access_token=token),
@@ -60,13 +60,13 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
 
 
 @router.put("/user")
-def update_user(
+async def update_user(
     payload: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
 ):
     service = _make_service(db)
-    user = service.update_profile(
+    user = await service.update_profile(
         current_user,
         email=payload.email,
         username=payload.username,
