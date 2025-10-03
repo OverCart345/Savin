@@ -19,7 +19,7 @@ async def create_article(payload: ArticleCreate, db: AsyncSession = Depends(get_
         title=payload.title,
         description=payload.description,
         body=payload.body,
-        tag_list=payload.tagList,
+        tag_list=payload.tag_list,
         author_id=current_user.id,
     )
     return ArticleOut.model_validate(article, from_attributes=True)
@@ -49,7 +49,7 @@ async def update_article(id: int, payload: ArticleUpdate, db: AsyncSession = Dep
         raise HTTPException(status_code=404, detail="Article not found")
     if article.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    article = await service.update(article, title=payload.title, description=payload.description, body=payload.body, tag_list=payload.tagList)
+    article = await service.update(article, title=payload.title, description=payload.description, body=payload.body, tag_list=payload.tag_list)
     return ArticleOut.model_validate(article, from_attributes=True)
 
 
