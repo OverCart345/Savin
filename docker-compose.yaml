@@ -1,52 +1,131 @@
 services:
-  app:
-    build: .
-    container_name: blog_app
-    env_file:
-      - .env
+  # PostgreSQL для backend (articles, comments)
+  db-main:
+    image: postgres:16
+    container_name: blog_db_main
     environment:
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=blog
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
     ports:
-      - "8000:8000"
+      - "5434:5432"  # внешний порт +2
+    volumes:
+      - pg_main_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d blog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+    profiles: ["dev", "prod"]
+
+  # PostgreSQL для users-service
+  db-users:
+    image: postgres:16
+    container_name: blog_db_users
+    environment:
+      - POSTGRES_DB=users_db
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    ports:
+      - "5435:5432"  # внешний порт +3
+    volumes:
+      - pg_users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d users_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+    profiles: ["dev", "prod"]
+
+  # Backend service (articles, comments)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: blog_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db-main
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=blog
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    ports:
+      - "8002:8000"  # внешний порт +2
     depends_on:
-      db:
+      db-main:
         condition: service_healthy
-    command: >
-      uvicorn src.main:app
-      --host 0.0.0.0
-      --port 8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - internal
     profiles: ["prod"]
 
-  db:
-    image: postgres:16
-    container_name: blog_db
+  # Users service
+  users-api:
+    build:
+      context: ./users_service
+      dockerfile: Dockerfile
+    container_name: blog_users_api
     env_file:
-      - .env
+      - ./users_service/.env
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db-users
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=users_db
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
     ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+      - "8003:8000"  # внешний порт +3
+    depends_on:
+      db-users:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
       timeout: 5s
-      retries: 5
-      start_period: 20s
-    profiles: ["prod", "dev"]
+      retries: 3
+      start_period: 30s
+    networks:
+      - internal
+    profiles: ["prod"]
+
+  # API Gateway (Nginx)
+  api-gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: blog_api_gateway
+    ports:
+      - "8000:80"  # Единая точка входа
+    depends_on:
+      - backend
+      - users-api
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - internal
+    profiles: ["prod"]
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
-  pg_data:
+  pg_main_data:
+  pg_users_data:
