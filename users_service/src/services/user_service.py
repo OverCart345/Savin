@@ -29,6 +29,7 @@ class UserService:
         password: Optional[str] = None,
         bio: Optional[str] = None,
         image_url: Optional[str] = None,
+        subscription_key: Optional[str] = None,
     ) -> User:
         if email is not None:
             user.email = email
@@ -40,5 +41,7 @@ class UserService:
             user.bio = bio
         if image_url is not None:
             user.image_url = image_url
+        if subscription_key is not None:
+            user.subscription_key = subscription_key
         await self._repo.update(user)
         return user

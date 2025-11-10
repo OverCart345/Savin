@@ -4,9 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_db_session, get_current_user
 from core.security import create_access_token
 from repositories.user_repo import UserRepository
+from repositories.subscriber_repo import SubscriberRepository
 from schemas.auth import TokenOut
 from schemas.user import UserCreate, UserLogin, UserOut, UserUpdate
+from schemas.subscription import SubscriptionKeyUpdate, SubscribeRequest
 from services.user_service import UserService
+from services.subscription_service import SubscriptionService
 from models.user import User
 
 router = APIRouter(prefix="/api", tags=["users"])
@@ -73,6 +76,7 @@ async def update_user(
         password=payload.password,
         bio=payload.bio,
         image_url=payload.image_url,
+        subscription_key=payload.subscription_key,
     )
     return _build_response(user)
 
@@ -82,3 +86,39 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db_session)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return UserOut.model_validate(user.__dict__, from_attributes=True)
+
+
+@router.put("/users/me/subscription-key")
+async def update_subscription_key(
+    payload: SubscriptionKeyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    service = _make_service(db)
+    user = await service.update_profile(
+        current_user,
+        subscription_key=payload.subscription_key,
+    )
+    return {
+        "user": UserOut.model_validate(user.__dict__, from_attributes=True),
+    }
+
+
+@router.post("/users/subscribe", status_code=204)
+async def subscribe_to_user(
+    payload: SubscribeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    subscription_service = SubscriptionService(
+        SubscriberRepository(db),
+        UserRepository(db)
+    )
+    try:
+        await subscription_service.subscribe(
+            subscriber_id=current_user.id,
+            author_id=payload.target_user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return None

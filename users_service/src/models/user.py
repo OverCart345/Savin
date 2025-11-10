@@ -13,3 +13,4 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    subscription_key: Mapped[str | None] = mapped_column(Text, nullable=True)

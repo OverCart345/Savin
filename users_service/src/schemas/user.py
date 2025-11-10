@@ -20,6 +20,7 @@ class UserUpdate(BaseModel):
     password: str | None = None
     bio: str | None = None
     image_url: str | None = None
+    subscription_key: str | None = None
 
 
 class UserOut(BaseModel):
@@ -28,3 +29,4 @@ class UserOut(BaseModel):
     username: str
     bio: str | None
     image_url: str | None
+    subscription_key: str | None = None

@@ -1,4 +1,29 @@
 services:
+  # Redis для очереди задач
+  redis:
+    image: redis:7-alpine
+    container_name: blog_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+    profiles: ["dev", "prod"]
+
+  # Push-notificator сервис
+  push-notificator:
+    image: ghcr.io/ayusavin/push-notification-playground:1.0.0
+    container_name: blog_push_notificator
+    ports:
+      - "8001:8000"
+    networks:
+      - internal
+    profiles: ["prod"]
+
   # PostgreSQL для backend (articles, comments)
   db-main:
     image: postgres:16
@@ -8,7 +33,7 @@ services:
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
     ports:
-      - "5434:5432"  # внешний порт +2
+      - "5434:5432"
     volumes:
       - pg_main_data:/var/lib/postgresql/data
     healthcheck:
@@ -57,10 +82,13 @@ services:
       - POSTGRES_DB=blog
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
+      - REDIS_URL=redis://redis:6379/0
     ports:
       - "8002:8000"
     depends_on:
       db-main:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
@@ -97,6 +125,34 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - internal
+    profiles: ["prod"]
+
+  # Worker service (обработка уведомлений)
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: blog_worker
+    env_file:
+      - ./worker/.env
+    environment:
+      - POSTGRES_HOST=db-users
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=users_db
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+      - REDIS_URL=redis://redis:6379/0
+      - PUSH_URL=http://push-notificator:8000/api/v1/notify
+    depends_on:
+      db-users:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      push-notificator:
+        condition: service_started
+    restart: unless-stopped
     networks:
       - internal
     profiles: ["prod"]

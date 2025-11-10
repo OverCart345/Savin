@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_db_session, get_current_user_id
+from core.redis_queue import RedisQueue, get_redis_queue
 from repositories.article_repo import ArticleRepository
 from services.article_service import ArticleService
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleOut
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/api", tags=["articles"])
 async def create_article(
     payload: ArticleCreate, 
     db: AsyncSession = Depends(get_db_session), 
-    current_user_id: int = Depends(get_current_user_id)
+    current_user_id: int = Depends(get_current_user_id),
+    redis: RedisQueue = Depends(get_redis_queue)
 ):
     service = ArticleService(ArticleRepository(db))
     article = await service.create(
@@ -25,6 +27,16 @@ async def create_article(
         tag_list=payload.tag_list,
         author_id=current_user_id,
     )
+    
+    try:
+        await redis.enqueue_notification(
+            author_id=current_user_id,
+            post_id=article.id,
+            post_title=article.title
+        )
+    except Exception as e:
+        print(f"Failed to enqueue notification: {e}")
+    
     return ArticleOut.model_validate(article, from_attributes=True)
 
 
