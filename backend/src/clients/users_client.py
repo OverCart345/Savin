@@ -1,6 +1,9 @@
 """HTTP client for communication with users-service."""
 import httpx
 from typing import Optional, Dict, Any
+from jose import JWTError
+
+from core.security import decode_access_token
 
 
 class UsersClient:
@@ -28,17 +31,12 @@ class UsersClient:
     
     async def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
         try:
-            response = await self.client.get(
-                "/api/user",
-                headers={"Authorization": f"Bearer {token}"}
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return None
-                
-        except httpx.HTTPError:
+            payload = decode_access_token(token)
+            return {
+                "sub": payload.get("sub"),
+                "exp": payload.get("exp")
+            }
+        except JWTError:
             return None
 
 

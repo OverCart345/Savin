@@ -8,7 +8,7 @@ services:
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
     ports:
-      - "5434:5432"  # внешний порт +2
+      - "5434:5432"
     volumes:
       - pg_main_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +30,7 @@ services:
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
     ports:
-      - "5435:5432"  # внешний порт +3
+      - "5435:5432"
     volumes:
       - pg_users_data:/var/lib/postgresql/data
     healthcheck:
@@ -87,7 +87,7 @@ services:
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
     ports:
-      - "8003:8000"  # внешний порт +3
+      - "8003:8000"
     depends_on:
       db-users:
         condition: service_healthy
@@ -101,7 +101,7 @@ services:
       - internal
     profiles: ["prod"]
 
-  # API Gateway (Nginx)
+  # API Gateway
   api-gateway:
     build:
       context: ./api_gateway
