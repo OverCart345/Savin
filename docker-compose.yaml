@@ -58,7 +58,7 @@ services:
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=app
     ports:
-      - "8002:8000"  # внешний порт +2
+      - "8002:8000"
     depends_on:
       db-main:
         condition: service_healthy
@@ -108,7 +108,7 @@ services:
       dockerfile: Dockerfile
     container_name: blog_api_gateway
     ports:
-      - "8000:80"  # Единая точка входа
+      - "8000:80"
     depends_on:
       - backend
       - users-api

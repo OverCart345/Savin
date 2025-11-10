@@ -17,7 +17,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Recreate users table
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
